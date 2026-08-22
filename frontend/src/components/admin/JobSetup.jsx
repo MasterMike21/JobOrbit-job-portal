@@ -1,15 +1,14 @@
-import React, { useState, useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import Navbar from '../shared/Navbar'
+import { Button } from '../ui/button'
+import { ArrowLeft, Loader2, Search, CheckSquare, Square, GraduationCap } from 'lucide-react'
 import { Label } from '../ui/label'
 import { Input } from '../ui/input'
-import { Button } from '../ui/button'
 import { Textarea } from '../ui/textarea'
-import { useSelector } from 'react-redux'
 import axios from 'axios'
 import { JOB_API_END_POINT } from '@/utils/constant'
+import { useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
-import { useNavigate } from 'react-router-dom'
-import { Loader2, CheckSquare, Square, Search, GraduationCap } from 'lucide-react'
 import { City } from 'country-state-city'
 import { indianQualifications, indianColleges } from '@/utils/indiaEducationData'
 
@@ -40,26 +39,14 @@ const allBranchesList = Array.from(new Set(
     )
 ));
 
-const PostJob = () => {
-    const { user } = useSelector(store => store.auth);
-    const { companies } = useSelector(store => store.company);
+const JobSetup = () => {
+    const params = useParams();
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
-
-    const recruiterCompany = user?.profile?.company?._id 
-        ? user.profile.company 
-        : (companies?.find(c => c._id === user?.profile?.company || c.userId === user?._id) || user?.profile?.company);
 
     const [allCities, setAllCities] = useState([]);
     const [citySearch, setCitySearch] = useState("");
     const [collegeSearch, setCollegeSearch] = useState("");
-
-    useEffect(() => {
-        const inCities = City.getCitiesOfCountry("IN").map(c => `${c.name}, India`);
-        const usCities = City.getCitiesOfCountry("US").slice(0, 40).map(c => `${c.name}, United States`);
-        const ukCities = City.getCitiesOfCountry("GB").slice(0, 20).map(c => `${c.name}, United Kingdom`);
-        setAllCities([...inCities, ...usCities, ...ukCities]);
-    }, []);
 
     const [input, setInput] = useState({
         title: "",
@@ -75,7 +62,7 @@ const PostJob = () => {
         minTwelfthPercent: 0
     });
 
-    // Disclose positions toggle
+    // Disclose positions toggle state
     const [disclosePositions, setDisclosePositions] = useState(true);
 
     const [selectedLocations, setSelectedLocations] = useState([]);
@@ -84,7 +71,6 @@ const PostJob = () => {
     const [selectedBranches, setSelectedBranches] = useState([]);
     const [selectedColleges, setSelectedColleges] = useState([]);
 
-    // Master Open To All states
     const [openAllCriteria, setOpenAllCriteria] = useState(false);
     const [openAllColleges, setOpenAllColleges] = useState(true);
     const [openAllBranches, setOpenAllBranches] = useState(true);
@@ -92,6 +78,74 @@ const PostJob = () => {
     const [openAllQualifications, setOpenAllQualifications] = useState(true);
 
     const [conversionFactor, setConversionFactor] = useState("10");
+
+    useEffect(() => {
+        const inCities = City.getCitiesOfCountry("IN").map(c => `${c.name}, India`);
+        const usCities = City.getCitiesOfCountry("US").slice(0, 40).map(c => `${c.name}, United States`);
+        const ukCities = City.getCitiesOfCountry("GB").slice(0, 20).map(c => `${c.name}, United Kingdom`);
+        setAllCities([...inCities, ...usCities, ...ukCities]);
+    }, []);
+
+    // Load initial job data
+    useEffect(() => {
+        const fetchJob = async () => {
+            try {
+                const res = await axios.get(`${JOB_API_END_POINT}/get/${params.id}`, { withCredentials: true });
+                if (res.data.success && res.data.job) {
+                    const job = res.data.job;
+                    
+                    const isDisclosed = job.position !== undefined && Number(job.position) > 0;
+                    setDisclosePositions(isDisclosed);
+
+                    setInput({
+                        title: job.title || "",
+                        description: job.description || "",
+                        requirements: Array.isArray(job.requirements) ? job.requirements.join("\n") : (job.requirements || ""),
+                        salary: job.salary ?? "",
+                        jobType: job.jobType || "Full Time",
+                        experience: job.experienceLevel !== undefined ? job.experienceLevel : 0,
+                        position: isDisclosed ? job.position : 1,
+                        minCgpa: job.minCgpa || 0,
+                        minPercentage: job.minPercentage || 0,
+                        minTenthPercent: job.minTenthPercent || 0,
+                        minTwelfthPercent: job.minTwelfthPercent || 0
+                    });
+
+                    if (job.location) {
+                        setSelectedLocations(job.location.split(" | ").map(l => l.trim()));
+                    }
+
+                    if (job.allowedQualifications?.length > 0) {
+                        setSelectedQualifications(job.allowedQualifications);
+                        setOpenAllQualifications(false);
+                    }
+                    if (job.allowedDegrees?.length > 0) {
+                        setSelectedDegrees(job.allowedDegrees);
+                        setOpenAllDegrees(false);
+                    }
+                    if (job.allowedBranches?.length > 0) {
+                        setSelectedBranches(job.allowedBranches);
+                        setOpenAllBranches(false);
+                    }
+                    if (job.allowedColleges?.length > 0) {
+                        setSelectedColleges(job.allowedColleges);
+                        setOpenAllColleges(false);
+                    }
+
+                    if (!job.minCgpa && !job.minTenthPercent && !job.minTwelfthPercent && 
+                        (!job.allowedQualifications || job.allowedQualifications.length === 0) &&
+                        (!job.allowedDegrees || job.allowedDegrees.length === 0) &&
+                        (!job.allowedBranches || job.allowedBranches.length === 0) &&
+                        (!job.allowedColleges || job.allowedColleges.length === 0)) {
+                        setOpenAllCriteria(true);
+                    }
+                }
+            } catch (error) {
+                console.error("Fetch job error:", error);
+            }
+        };
+        fetchJob();
+    }, [params.id]);
 
     const calculateEquivalent = (val, isCgpaInput, factor) => {
         const num = parseFloat(val) || 0;
@@ -166,13 +220,6 @@ const PostJob = () => {
         try {
             setLoading(true);
 
-            const assignedCompanyId = recruiterCompany?._id || user?.profile?.company?._id || user?.profile?.company;
-
-            if (!assignedCompanyId) {
-                toast.error("Assigned company not found. Please verify your company profile.");
-                return;
-            }
-
             if (selectedLocations.length === 0) {
                 toast.error("Please select at least one job location.");
                 return;
@@ -182,11 +229,6 @@ const PostJob = () => {
                 .split("\n")
                 .map(r => r.replace(/^[•\-\*]\s*/, '').trim())
                 .filter(Boolean);
-
-            if (formattedRequirements.length === 0) {
-                toast.error("Please provide at least one requirement.");
-                return;
-            }
 
             const payload = {
                 title: input.title.trim(),
@@ -198,8 +240,6 @@ const PostJob = () => {
                 experience: Number(input.experience),
                 experienceLevel: Number(input.experience),
                 position: disclosePositions ? (Number(input.position) || 1) : 0,
-                companyId: assignedCompanyId,
-                company: assignedCompanyId,
                 minCgpa: openAllCriteria ? 0 : Number(input.minCgpa),
                 minPercentage: openAllCriteria ? 0 : Number(input.minPercentage),
                 minTenthPercent: openAllCriteria ? 0 : Number(input.minTenthPercent),
@@ -210,18 +250,18 @@ const PostJob = () => {
                 allowedColleges: openAllColleges ? [] : selectedColleges
             };
 
-            const res = await axios.post(`${JOB_API_END_POINT}/post`, payload, {
+            const res = await axios.put(`${JOB_API_END_POINT}/update/${params.id}`, payload, {
                 headers: { 'Content-Type': 'application/json' },
                 withCredentials: true
             });
 
             if (res.data.success) {
-                toast.success(res.data.message || "Job posted successfully");
+                toast.success(res.data.message || "Job updated successfully");
                 navigate("/admin/jobs");
             }
         } catch (error) {
-            console.error("Post Job Error:", error);
-            toast.error(error.response?.data?.message || "Failed to post job opening.");
+            console.error("Update Job Error:", error);
+            toast.error(error.response?.data?.message || "Failed to update job opening.");
         } finally {
             setLoading(false);
         }
@@ -233,19 +273,22 @@ const PostJob = () => {
             <div className='flex items-center justify-center my-8 px-4'>
                 <form onSubmit={submitHandler} className='p-8 max-w-5xl w-full border border-gray-200 dark:border-gray-800 shadow-xl rounded-2xl bg-white dark:bg-[#111827] space-y-6'>
                     
-                    <div className="flex justify-between items-center border-b border-gray-200 dark:border-gray-800 pb-4">
+                    <div className="flex items-center gap-4 border-b border-gray-200 dark:border-gray-800 pb-4">
+                        <Button 
+                            type="button" 
+                            onClick={() => navigate("/admin/jobs")} 
+                            variant="outline" 
+                            size="icon" 
+                            className="rounded-full h-9 w-9 border-gray-300 dark:border-gray-700 bg-white dark:bg-[#1f2937] hover:bg-gray-100 dark:hover:bg-gray-800 shrink-0"
+                        >
+                            <ArrowLeft className="w-4 h-4" />
+                        </Button>
                         <div>
                             <div className="flex items-center gap-2">
                                 <GraduationCap className="w-6 h-6 text-[#6A38C2]" />
-                                <h2 className='text-2xl font-bold text-gray-900 dark:text-white'>Post Campus / Early-Career Opening</h2>
+                                <h2 className='text-2xl font-bold text-gray-900 dark:text-white'>Edit Opening Details</h2>
                             </div>
-                            <p className="text-xs text-gray-500 mt-1">Configure opening details tailored for student applicants and set screening rules.</p>
-                        </div>
-                        <div className="text-right">
-                            <span className="text-xs uppercase font-semibold text-purple-600 dark:text-purple-400">Assigned Company</span>
-                            <div className="font-bold text-lg text-gray-800 dark:text-gray-200">
-                                {recruiterCompany?.name || user?.profile?.company?.name || "Company"}
-                            </div>
+                            <p className="text-xs text-gray-500 mt-1">Update campus eligibility rules, salary packages, and technical requirements.</p>
                         </div>
                     </div>
 
@@ -254,7 +297,7 @@ const PostJob = () => {
                             <Label className="font-semibold text-gray-700 dark:text-gray-300">Job Title *</Label>
                             <Input
                                 type="text"
-                                placeholder="e.g. Graduate Software Engineer / SDE-1"
+                                placeholder="e.g. Graduate Software Engineer"
                                 value={input.title}
                                 onChange={(e) => setInput({ ...input, title: e.target.value })}
                                 className="my-1 bg-white dark:bg-[#1f2937] border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100 focus-visible:ring-purple-500"
@@ -324,12 +367,12 @@ const PostJob = () => {
                             </div>
                         </div>
 
-                        {/* Multiline Description & Bullet Requirements */}
+                        {/* Description & Bullet Requirements */}
                         <div className="col-span-2">
                             <Label className="font-semibold text-gray-700 dark:text-gray-300">Job Description (Supports **bold** formatting and bullet lines) *</Label>
                             <Textarea
                                 rows={4}
-                                placeholder="Enter detailed job overview, responsibilities, and team benefits..."
+                                placeholder="Enter detailed job overview, responsibilities, and team culture..."
                                 value={input.description}
                                 onChange={(e) => setInput({ ...input, description: e.target.value })}
                                 className="my-1 bg-white dark:bg-[#1f2937] border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100 focus-visible:ring-purple-500"
@@ -341,7 +384,7 @@ const PostJob = () => {
                             <Label className="font-semibold text-gray-700 dark:text-gray-300">Key Technical Requirements (Enter new line for each bullet point) *</Label>
                             <Textarea
                                 rows={4}
-                                placeholder={"• Strong proficiency in React, TypeScript, and Node.js\n• Solid understanding of Data Structures & Algorithms\n• Experience building RESTful APIs"}
+                                placeholder={"• Strong knowledge of C++, React, and Node.js\n• Solid understanding of Data Structures & Algorithms\n• Experience building RESTful APIs"}
                                 value={input.requirements}
                                 onChange={(e) => setInput({ ...input, requirements: e.target.value })}
                                 className="my-1 bg-white dark:bg-[#1f2937] border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100 focus-visible:ring-purple-500"
@@ -364,7 +407,7 @@ const PostJob = () => {
                                 <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
                                 <Input
                                     type="text"
-                                    placeholder="Search global cities (e.g. Bangalore, Chandigarh, Hyderabad, San Francisco)..."
+                                    placeholder="Search global cities..."
                                     value={citySearch}
                                     onChange={(e) => setCitySearch(e.target.value)}
                                     className="pl-9 my-1 text-xs bg-white dark:bg-[#1f2937] border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100 focus-visible:ring-purple-500"

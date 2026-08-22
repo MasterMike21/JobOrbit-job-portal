@@ -1,4 +1,5 @@
-import { createBrowserRouter, RouterProvider } from 'react-router-dom'
+import React from 'react'
+import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom'
 import Navbar from './components/shared/Navbar'
 import Login from './components/auth/Login'
 import Signup from './components/auth/Signup'
@@ -7,16 +8,17 @@ import Jobs from './components/Jobs'
 import Browse from './components/Browse'
 import Profile from './components/Profile'
 import JobDescription from './components/JobDescription'
-import Companies from './components/admin/Companies'
-import CompanyCreate from './components/admin/CompanyCreate'
-import CompanySetup from './components/admin/CompanySetup'
-import AdminJobs from "./components/admin/AdminJobs";
+
+// Admin / Recruiter Imports
+import AdminJobs from "./components/admin/AdminJobs"
 import PostJob from './components/admin/PostJob'
 import Applicants from './components/admin/Applicants'
+import JobSetup from './components/admin/JobSetup'
+import CompanyProfile from './components/admin/CompanyProfile'
 import ProtectedRoute from './components/admin/ProtectedRoute'
 
-
 const appRouter = createBrowserRouter([
+  // Public & Applicant Routes
   {
     path: '/',
     element: <Home />
@@ -45,35 +47,39 @@ const appRouter = createBrowserRouter([
     path: "/profile",
     element: <Profile />
   },
-  // admin ke liye yha se start hoga
-  {
-    path:"/admin/companies",
-    element: <ProtectedRoute><Companies/></ProtectedRoute>
-  },
-  {
-    path:"/admin/companies/create",
-    element: <ProtectedRoute><CompanyCreate/></ProtectedRoute> 
-  },
-  {
-    path:"/admin/companies/:id",
-    element:<ProtectedRoute><CompanySetup/></ProtectedRoute> 
-  },
-  {
-    path:"/admin/jobs",
-    element:<ProtectedRoute><AdminJobs/></ProtectedRoute> 
-  },
-  {
-    path:"/admin/jobs/create",
-    element:<ProtectedRoute><PostJob/></ProtectedRoute> 
-  },
-  {
-    path:"/admin/jobs/:id/applicants",
-    element:<ProtectedRoute><Applicants/></ProtectedRoute> 
-  },
 
-])
+  // Recruiter Routes
+  {
+    path: "/admin/company",
+    element: <ProtectedRoute><CompanyProfile /></ProtectedRoute>
+  },
+  {
+    path: "/admin/companies",
+    element: <Navigate to="/admin/company" replace />
+  },
+  {
+    path: "/admin/companies/create",
+    element: <Navigate to="/admin/company" replace />
+  },
+  {
+    path: "/admin/jobs",
+    element: <ProtectedRoute><AdminJobs /></ProtectedRoute>
+  },
+  {
+    path: "/admin/jobs/create",
+    element: <ProtectedRoute><PostJob /></ProtectedRoute>
+  },
+  {
+    path: "/admin/jobs/:id",
+    element: <ProtectedRoute><JobSetup /></ProtectedRoute>
+  },
+  {
+    path: "/admin/jobs/:id/applicants",
+    element: <ProtectedRoute><Applicants /></ProtectedRoute>
+  }
+]);
+
 function App() {
-
   return (
     <div>
       <RouterProvider router={appRouter} />
@@ -81,4 +87,4 @@ function App() {
   )
 }
 
-export default App
+export default App;

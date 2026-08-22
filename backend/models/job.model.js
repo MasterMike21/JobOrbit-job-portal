@@ -3,7 +3,8 @@ import mongoose from "mongoose";
 const jobSchema = new mongoose.Schema({
     title: {
         type: String,
-        required: true
+        required: true,
+        trim: true
     },
     description: {
         type: String,
@@ -16,22 +17,55 @@ const jobSchema = new mongoose.Schema({
         type: Number,
         required: true
     },
-    experienceLevel:{
-        type:Number,
-        required:true,
+    experienceLevel: {
+        type: Number,
+        required: true
     },
     location: {
         type: String,
-        required: true
+        required: true,
+        trim: true
     },
     jobType: {
         type: String,
-        required: true
+        required: true,
+        trim: true
     },
     position: {
         type: Number,
         required: true
     },
+
+    // Screening Cutoffs & Criteria (0 or empty array = open to all)
+    minCgpa: {
+        type: Number,
+        default: 0
+    },
+    minTenthPercent: {
+        type: Number,
+        default: 0
+    },
+    minTwelfthPercent: {
+        type: Number,
+        default: 0
+    },
+    allowedQualifications: [{
+        type: String,
+        trim: true
+    }],
+    allowedDegrees: [{
+        type: String,
+        trim: true
+    }],
+    allowedBranches: [{
+        type: String,
+        trim: true
+    }],
+    allowedColleges: [{
+        type: String,
+        trim: true
+    }],
+
     company: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Company',
@@ -45,8 +79,9 @@ const jobSchema = new mongoose.Schema({
     applications: [
         {
             type: mongoose.Schema.Types.ObjectId,
-            ref: 'Application',
+            ref: 'Application'
         }
     ]
-},{timestamps:true});
+}, { timestamps: true });
+
 export const Job = mongoose.model("Job", jobSchema);
