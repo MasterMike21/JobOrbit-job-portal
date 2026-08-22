@@ -8,8 +8,8 @@ import { useSelector } from 'react-redux'
 import axios from 'axios'
 import { JOB_API_END_POINT } from '@/utils/constant'
 import { toast } from 'sonner'
-import { useNavigate } from 'react-router-dom'
-import { Loader2, CheckSquare, Square, Search, GraduationCap } from 'lucide-react'
+import { useNavigate, useParams } from 'react-router-dom'
+import { Loader2, CheckSquare, Square, Search, GraduationCap, Mail, Edit3 } from 'lucide-react'
 import { City } from 'country-state-city'
 import { indianQualifications, indianColleges } from '@/utils/indiaEducationData'
 
@@ -40,11 +40,14 @@ const allBranchesList = Array.from(new Set(
     )
 ));
 
-const PostJob = () => {
+const PostJob = ({ editMode = false }) => {
+    const { id } = useParams();
+    const isEditing = Boolean(id) || editMode;
     const { user } = useSelector(store => store.auth);
     const { companies } = useSelector(store => store.company);
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
+    const [fetchingJob, setFetchingJob] = useState(false);
 
     const recruiterCompany = user?.profile?.company?._id 
         ? user.profile.company 
@@ -72,19 +75,18 @@ const PostJob = () => {
         minCgpa: 0,
         minPercentage: 0,
         minTenthPercent: 0,
-        minTwelfthPercent: 0
+        minTwelfthPercent: 0,
+        acceptanceEmailTemplate: "",
+        rejectionEmailTemplate: ""
     });
 
-    // Disclose positions toggle
     const [disclosePositions, setDisclosePositions] = useState(true);
-
     const [selectedLocations, setSelectedLocations] = useState([]);
     const [selectedQualifications, setSelectedQualifications] = useState([]);
     const [selectedDegrees, setSelectedDegrees] = useState([]);
     const [selectedBranches, setSelectedBranches] = useState([]);
     const [selectedColleges, setSelectedColleges] = useState([]);
 
-    // Master Open To All states
     const [openAllCriteria, setOpenAllCriteria] = useState(false);
     const [openAllColleges, setOpenAllColleges] = useState(true);
     const [openAllBranches, setOpenAllBranches] = useState(true);
@@ -92,6 +94,64 @@ const PostJob = () => {
     const [openAllQualifications, setOpenAllQualifications] = useState(true);
 
     const [conversionFactor, setConversionFactor] = useState("10");
+
+    // Fetch existing job details if in Edit Mode
+    useEffect(() => {
+        if (id) {
+            const fetchJobDetails = async () => {
+                try {
+                    setFetchingJob(true);
+                    const res = await axios.get(`${JOB_API_END_POINT}/get/${id}`, { withCredentials: true });
+                    if (res.data.success) {
+                        const job = res.data.job;
+                        setInput({
+                            title: job.title || "",
+                            description: job.description || "",
+                            requirements: Array.isArray(job.requirements) ? job.requirements.join("\n") : (job.requirements || ""),
+                            salary: job.salary || "",
+                            jobType: job.jobType || "Full Time",
+                            experience: job.experienceLevel || 0,
+                            position: job.position || 1,
+                            minCgpa: job.minCgpa || 0,
+                            minPercentage: job.minPercentage || 0,
+                            minTenthPercent: job.minTenthPercent || 0,
+                            minTwelfthPercent: job.minTwelfthPercent || 0,
+                            acceptanceEmailTemplate: job.acceptanceEmailTemplate || "",
+                            rejectionEmailTemplate: job.rejectionEmailTemplate || ""
+                        });
+
+                        setDisclosePositions(Number(job.position) > 0);
+                        if (job.location) {
+                            setSelectedLocations(job.location.split(" | ").map(l => l.trim()));
+                        }
+
+                        if (job.allowedQualifications && job.allowedQualifications.length > 0) {
+                            setSelectedQualifications(job.allowedQualifications);
+                            setOpenAllQualifications(false);
+                        }
+                        if (job.allowedDegrees && job.allowedDegrees.length > 0) {
+                            setSelectedDegrees(job.allowedDegrees);
+                            setOpenAllDegrees(false);
+                        }
+                        if (job.allowedBranches && job.allowedBranches.length > 0) {
+                            setSelectedBranches(job.allowedBranches);
+                            setOpenAllBranches(false);
+                        }
+                        if (job.allowedColleges && job.allowedColleges.length > 0) {
+                            setSelectedColleges(job.allowedColleges);
+                            setOpenAllColleges(false);
+                        }
+                    }
+                } catch (error) {
+                    console.error("Fetch Job Error:", error);
+                    toast.error("Failed to load opening details for editing.");
+                } finally {
+                    setFetchingJob(false);
+                }
+            };
+            fetchJobDetails();
+        }
+    }, [id]);
 
     const calculateEquivalent = (val, isCgpaInput, factor) => {
         const num = parseFloat(val) || 0;
@@ -207,25 +267,39 @@ const PostJob = () => {
                 allowedQualifications: openAllQualifications ? [] : selectedQualifications,
                 allowedDegrees: openAllDegrees ? [] : selectedDegrees,
                 allowedBranches: openAllBranches ? [] : selectedBranches,
-                allowedColleges: openAllColleges ? [] : selectedColleges
+                allowedColleges: openAllColleges ? [] : selectedColleges,
+                acceptanceEmailTemplate: input.acceptanceEmailTemplate,
+                rejectionEmailTemplate: input.rejectionEmailTemplate
             };
 
-            const res = await axios.post(`${JOB_API_END_POINT}/post`, payload, {
+            const endpoint = id 
+                ? `${JOB_API_END_POINT}/update/${id}` 
+                : `${JOB_API_END_POINT}/post`;
+
+            const res = await axios.post(endpoint, payload, {
                 headers: { 'Content-Type': 'application/json' },
                 withCredentials: true
             });
 
             if (res.data.success) {
-                toast.success(res.data.message || "Job posted successfully");
+                toast.success(res.data.message || (id ? "Job updated successfully!" : "Job opening posted successfully!"));
                 navigate("/admin/jobs");
             }
         } catch (error) {
-            console.error("Post Job Error:", error);
-            toast.error(error.response?.data?.message || "Failed to post job opening.");
+            console.error("Post / Update Job Error:", error);
+            toast.error(error.response?.data?.message || "Failed to save job opening.");
         } finally {
             setLoading(false);
         }
     };
+
+    if (fetchingJob) {
+        return (
+            <div className="min-h-screen bg-gray-50 dark:bg-[#0b0f19] text-gray-900 dark:text-gray-100 flex items-center justify-center">
+                <Loader2 className="w-8 h-8 animate-spin text-[#6A38C2]" />
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-[#0b0f19] text-gray-900 dark:text-gray-100 transition-colors duration-200">
@@ -233,13 +307,18 @@ const PostJob = () => {
             <div className='flex items-center justify-center my-8 px-4'>
                 <form onSubmit={submitHandler} className='p-8 max-w-5xl w-full border border-gray-200 dark:border-gray-800 shadow-xl rounded-2xl bg-white dark:bg-[#111827] space-y-6'>
                     
+                    {/* Header */}
                     <div className="flex justify-between items-center border-b border-gray-200 dark:border-gray-800 pb-4">
                         <div>
                             <div className="flex items-center gap-2">
-                                <GraduationCap className="w-6 h-6 text-[#6A38C2]" />
-                                <h2 className='text-2xl font-bold text-gray-900 dark:text-white'>Post Campus / Early-Career Opening</h2>
+                                {isEditing ? <Edit3 className="w-6 h-6 text-[#6A38C2]" /> : <GraduationCap className="w-6 h-6 text-[#6A38C2]" />}
+                                <h2 className='text-2xl font-bold text-gray-900 dark:text-white'>
+                                    {isEditing ? "Edit Campus / Recruitment Opening" : "Post Campus / Early-Career Opening"}
+                                </h2>
                             </div>
-                            <p className="text-xs text-gray-500 mt-1">Configure opening details tailored for student applicants and set screening rules.</p>
+                            <p className="text-xs text-gray-500 mt-1">
+                                {isEditing ? "Update opening parameters, eligibility cutoffs, and custom email copies." : "Configure opening details tailored for student applicants and set screening rules."}
+                            </p>
                         </div>
                         <div className="text-right">
                             <span className="text-xs uppercase font-semibold text-purple-600 dark:text-purple-400">Assigned Company</span>
@@ -249,6 +328,7 @@ const PostJob = () => {
                         </div>
                     </div>
 
+                    {/* Primary Role Details */}
                     <div className='grid grid-cols-2 gap-4'>
                         <div>
                             <Label className="font-semibold text-gray-700 dark:text-gray-300">Job Title *</Label>
@@ -324,9 +404,9 @@ const PostJob = () => {
                             </div>
                         </div>
 
-                        {/* Multiline Description & Bullet Requirements */}
+                        {/* Description & Requirements */}
                         <div className="col-span-2">
-                            <Label className="font-semibold text-gray-700 dark:text-gray-300">Job Description (Supports **bold** formatting and bullet lines) *</Label>
+                            <Label className="font-semibold text-gray-700 dark:text-gray-300">Job Description *</Label>
                             <Textarea
                                 rows={4}
                                 placeholder="Enter detailed job overview, responsibilities, and team benefits..."
@@ -338,7 +418,7 @@ const PostJob = () => {
                         </div>
 
                         <div className="col-span-2">
-                            <Label className="font-semibold text-gray-700 dark:text-gray-300">Key Technical Requirements (Enter new line for each bullet point) *</Label>
+                            <Label className="font-semibold text-gray-700 dark:text-gray-300">Key Technical Requirements (Bullet points) *</Label>
                             <Textarea
                                 rows={4}
                                 placeholder={"• Strong proficiency in React, TypeScript, and Node.js\n• Solid understanding of Data Structures & Algorithms\n• Experience building RESTful APIs"}
@@ -349,7 +429,7 @@ const PostJob = () => {
                             />
                         </div>
 
-                        {/* Multi-City Selection Scroll Box */}
+                        {/* Locations */}
                         <div className="col-span-2 space-y-2">
                             <div className="flex justify-between items-center">
                                 <Label className="font-semibold text-gray-700 dark:text-gray-300">
@@ -628,13 +708,51 @@ const PostJob = () => {
                         </div>
                     </div>
 
+                    {/* Pre-configured Custom Email Templates */}
+                    <div className="p-5 bg-gray-50 dark:bg-[#111827]/90 border border-gray-200 dark:border-gray-800 rounded-xl space-y-3">
+                        <div className="flex items-center gap-2">
+                            <Mail className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                            <h3 className="font-bold text-sm text-gray-900 dark:text-white uppercase tracking-wider">
+                                Custom Email Notifications (Optional)
+                            </h3>
+                        </div>
+                        <p className="text-xs text-gray-500">
+                            Pre-set custom acceptance & rejection messages for this specific job opening.
+                        </p>
+
+                        <div className="grid grid-cols-2 gap-4 pt-1">
+                            <div>
+                                <Label className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">Default Shortlist / Acceptance Email Body</Label>
+                                <Textarea 
+                                    rows={4}
+                                    placeholder="We are thrilled to shortlist your resume! Next steps: Online Assessment link will be shared shortly..."
+                                    value={input.acceptanceEmailTemplate}
+                                    onChange={(e) => setInput({ ...input, acceptanceEmailTemplate: e.target.value })}
+                                    className="my-1 text-xs bg-white dark:bg-[#1f2937] border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100"
+                                />
+                            </div>
+
+                            <div>
+                                <Label className="text-xs font-semibold text-red-700 dark:text-red-400">Default Rejection Email Body</Label>
+                                <Textarea 
+                                    rows={4}
+                                    placeholder="Thank you for applying. While we were impressed with your profile, we will not be moving forward at this time..."
+                                    value={input.rejectionEmailTemplate}
+                                    onChange={(e) => setInput({ ...input, rejectionEmailTemplate: e.target.value })}
+                                    className="my-1 text-xs bg-white dark:bg-[#1f2937] border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Submit Button */}
                     {loading ? (
                         <Button className="w-full bg-[#6A38C2] text-white py-6" disabled>
-                            <Loader2 className='mr-2 h-4 w-4 animate-spin' /> Updating Job Opening...
+                            <Loader2 className='mr-2 h-4 w-4 animate-spin' /> {isEditing ? "Saving Changes..." : "Posting Campus Drive..."}
                         </Button>
                     ) : (
                         <Button type="submit" className="w-full bg-[#6A38C2] hover:bg-[#5b30a6] text-white font-semibold py-6 text-base shadow-lg">
-                            Update Job
+                            {isEditing ? "Save & Update Opening" : "Post Opening"}
                         </Button>
                     )}
                 </form>
@@ -643,4 +761,4 @@ const PostJob = () => {
     );
 };
 
-export default JobSetup;
+export default PostJob;

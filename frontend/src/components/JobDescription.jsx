@@ -31,7 +31,7 @@ import { toast } from 'sonner'
 import { Country, State, City } from 'country-state-city'
 import { indianQualifications, indianColleges, educationBoards } from '@/utils/indiaEducationData'
 
-// Selective Markdown formatter: only bolds **words** or section headings
+// Selective Markdown formatter: bolds **words** and formats bullet points
 const FormattedText = ({ text }) => {
     if (!text) return null;
 
@@ -116,7 +116,6 @@ const JobDescription = () => {
     const [citiesList, setCitiesList] = useState([]);
 
     const [formData, setFormData] = useState({
-        // Step 1: Personal Details
         fullName: "",
         email: "",
         phoneNumber: "",
@@ -124,16 +123,12 @@ const JobDescription = () => {
         country: "India",
         state: "Punjab",
         city: "Chandigarh",
-
-        // Step 2: Academic Hierarchy
         qualification: "Bachelors (4 Years)",
         degree: "B.E. (Bachelor of Engineering)",
         branch: "Information Technology",
         graduationYear: 2026,
         cgpa: "",
         skills: "",
-
-        // Step 3: Schooling & College
         tenthSchool: "",
         tenthBoard: "CBSE (Central Board of Secondary Education)",
         tenthPercentage: "",
@@ -142,8 +137,6 @@ const JobDescription = () => {
         twelfthPercentage: "",
         collegeCountry: "India",
         collegeName: "University Institute of Engineering and Technology (UIET), Panjab University, Chandigarh",
-
-        // Step 4: Profiles & Resume
         leetcode: "",
         github: "",
         linkedin: "",
@@ -532,7 +525,12 @@ const JobDescription = () => {
                                 <div className="p-3 bg-gray-50 dark:bg-[#1f2937]/50 rounded-xl border border-gray-200 dark:border-gray-800 text-center">
                                     <p className="text-[11px] text-gray-500 font-medium">Equivalent %</p>
                                     <p className="font-bold text-sm text-purple-600 dark:text-purple-400">
-                                        {singleJob?.minPercentage > 0 ? `${singleJob.minPercentage}%` : "None"}
+                                        {singleJob?.minPercentage > 0 
+                                            ? `${singleJob.minPercentage}%` 
+                                            : singleJob?.minCgpa > 0 
+                                                ? `${parseFloat((singleJob.minCgpa * 10).toFixed(1))}%` 
+                                                : "None"
+                                        }
                                     </p>
                                 </div>
                                 <div className="p-3 bg-gray-50 dark:bg-[#1f2937]/50 rounded-xl border border-gray-200 dark:border-gray-800 text-center">

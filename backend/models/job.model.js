@@ -66,6 +66,16 @@ const jobSchema = new mongoose.Schema({
         trim: true
     }],
 
+    // Pre-configured custom email templates per job opening
+    acceptanceEmailTemplate: {
+        type: String,
+        default: ""
+    },
+    rejectionEmailTemplate: {
+        type: String,
+        default: ""
+    },
+
     company: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Company',
@@ -76,6 +86,7 @@ const jobSchema = new mongoose.Schema({
         ref: 'User',
         required: true
     },
+    
     applications: [
         {
             type: mongoose.Schema.Types.ObjectId,

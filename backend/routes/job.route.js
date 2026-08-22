@@ -1,16 +1,19 @@
 import express from "express";
 import isAuthenticated from "../middlewares/isAuthenticated.js";
-import { getAdminJobs, getAllJobs, getJobById, postJob, updateJob } from "../controllers/job.controller.js";
+import { 
+    postJob, 
+    getAllJobs, 
+    getAdminJobs, 
+    getJobById, 
+    updateJob 
+} from "../controllers/job.controller.js";
 
 const router = express.Router();
 
-// Recruiter / Admin routes (Protected)
 router.route("/post").post(isAuthenticated, postJob);
-router.route("/getadminjobs").get(isAuthenticated, getAdminJobs);
-router.route("/update/:id").put(isAuthenticated, updateJob);
-
-// Public routes (Students and Guests can view)
 router.route("/get").get(getAllJobs);
+router.route("/getadminjobs").get(isAuthenticated, getAdminJobs);
 router.route("/get/:id").get(getJobById);
+router.route("/update/:id").post(isAuthenticated, updateJob); // 👈 This fixes the :8000/api/v1/job/update/:id 404
 
 export default router;

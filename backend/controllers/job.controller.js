@@ -1,6 +1,6 @@
 import { Job } from "../models/job.model.js";
 
-// admin post krega job
+// Admin posts a job opening
 export const postJob = async (req, res) => {
     try {
         const { 
@@ -13,23 +13,24 @@ export const postJob = async (req, res) => {
             experience, 
             experienceLevel,
             position, 
-            companyId,
-            company,
-            minCgpa,
-            minPercentage,
-            minTenthPercent,
-            minTwelfthPercent,
-            allowedQualifications,
-            allowedDegrees,
-            allowedBranches,
-            allowedColleges
+            companyId, 
+            company, 
+            minCgpa, 
+            minPercentage, 
+            minTenthPercent, 
+            minTwelfthPercent, 
+            allowedQualifications, 
+            allowedDegrees, 
+            allowedBranches, 
+            allowedColleges,
+            acceptanceEmailTemplate,
+            rejectionEmailTemplate
         } = req.body;
         
         const userId = req.id;
         const targetCompanyId = companyId || company;
         const targetExperience = experience !== undefined ? experience : experienceLevel;
 
-        // Note: salary and targetExperience can be 0 (for freshers/unpaid internships)
         if (
             !title || 
             !description || 
@@ -40,7 +41,8 @@ export const postJob = async (req, res) => {
             !jobType || 
             targetExperience === undefined || 
             targetExperience === null || 
-            !position || 
+            position === undefined || 
+            position === null || 
             !targetCompanyId
         ) {
             return res.status(400).json({
@@ -49,25 +51,45 @@ export const postJob = async (req, res) => {
             });
         }
 
+        // Format requirements safely
+        let formattedRequirements = [];
+        if (Array.isArray(requirements)) {
+            formattedRequirements = requirements.map(r => String(r).replace(/^[•\-\*]\s*/, '').trim()).filter(Boolean);
+        } else if (typeof requirements === 'string') {
+            formattedRequirements = requirements
+                .split("\n")
+                .flatMap(line => line.split(","))
+                .map(r => r.replace(/^[•\-\*]\s*/, '').trim())
+                .filter(Boolean);
+        }
+
+        // Calculate auto equivalent percentage if minPercentage was not provided but minCgpa exists
+        const parsedCgpa = Number(minCgpa) || 0;
+        const parsedPercentage = Number(minPercentage) > 0 
+            ? Number(minPercentage) 
+            : (parsedCgpa > 0 ? parseFloat((parsedCgpa * 10).toFixed(1)) : 0);
+
         const job = await Job.create({
-            title,
-            description,
-            requirements: Array.isArray(requirements) ? requirements : (typeof requirements === 'string' ? requirements.split(",") : []),
+            title: title.trim(),
+            description: description.trim(),
+            requirements: formattedRequirements,
             salary: Number(salary),
             location,
             jobType,
-            experienceLevel: Number(targetExperience),
-            position: Number(position),
+            experienceLevel: Number(targetExperience) || 0,
+            position: Number(position) || 0,
             company: targetCompanyId,
             created_by: userId,
-            minCgpa: Number(minCgpa) || 0,
-            minPercentage: Number(minPercentage) || 0,
+            minCgpa: parsedCgpa,
+            minPercentage: parsedPercentage,
             minTenthPercent: Number(minTenthPercent) || 0,
             minTwelfthPercent: Number(minTwelfthPercent) || 0,
-            allowedQualifications: allowedQualifications || [],
-            allowedDegrees: allowedDegrees || [],
-            allowedBranches: allowedBranches || [],
-            allowedColleges: allowedColleges || []
+            allowedQualifications: Array.isArray(allowedQualifications) ? allowedQualifications : [],
+            allowedDegrees: Array.isArray(allowedDegrees) ? allowedDegrees : [],
+            allowedBranches: Array.isArray(allowedBranches) ? allowedBranches : [],
+            allowedColleges: Array.isArray(allowedColleges) ? allowedColleges : [],
+            acceptanceEmailTemplate: acceptanceEmailTemplate || "",
+            rejectionEmailTemplate: rejectionEmailTemplate || ""
         });
 
         return res.status(201).json({
@@ -84,7 +106,7 @@ export const postJob = async (req, res) => {
     }
 };
 
-// student k liye (Always returns 200 with an array, never 404)
+// Student fetches all jobs with keyword search & company name match fallback
 export const getAllJobs = async (req, res) => {
     try {
         const keyword = req.query.keyword || "";
@@ -96,12 +118,10 @@ export const getAllJobs = async (req, res) => {
             ]
         };
 
-        // Find jobs matching title or description and populate company details
         let jobs = await Job.find(query).populate({
             path: "company"
         }).sort({ createdAt: -1 });
 
-        // If no direct title/description match was found, filter by populated company name
         if (!jobs || jobs.length === 0) {
             const allJobs = await Job.find({}).populate({
                 path: "company"
@@ -125,15 +145,14 @@ export const getAllJobs = async (req, res) => {
     }
 };
 
-// student job by id
+// Student & recruiter fetch job by id
 export const getJobById = async (req, res) => {
     try {
         const jobId = req.params.id;
-        const job = await Job.findById(jobId).populate({
-            path: "applications"
-        }).populate({
-            path: "company"
-        });
+        const job = await Job.findById(jobId)
+            .populate({ path: "applications" })
+            .populate({ path: "company" })
+            .populate({ path: "created_by", select: "-password" });
 
         if (!job) {
             return res.status(404).json({
@@ -152,7 +171,7 @@ export const getJobById = async (req, res) => {
     }
 };
 
-// admin kitne job create kra hai abhi tk
+// Admin fetches all jobs created by their account
 export const getAdminJobs = async (req, res) => {
     try {
         const adminId = req.id;
@@ -173,7 +192,7 @@ export const getAdminJobs = async (req, res) => {
     }
 };
 
-// update job
+// Admin updates existing job opening
 export const updateJob = async (req, res) => {
     try {
         const { 
@@ -184,60 +203,89 @@ export const updateJob = async (req, res) => {
             location, 
             jobType, 
             experience, 
-            experienceLevel,
-            position,
-            minCgpa,
-            minPercentage,
-            minTenthPercent,
-            minTwelfthPercent,
-            allowedQualifications,
-            allowedDegrees,
-            allowedBranches,
-            allowedColleges
+            experienceLevel, 
+            position, 
+            companyId,
+            company,
+            minCgpa, 
+            minPercentage, 
+            minTenthPercent, 
+            minTwelfthPercent, 
+            allowedQualifications, 
+            allowedDegrees, 
+            allowedBranches, 
+            allowedColleges,
+            acceptanceEmailTemplate,
+            rejectionEmailTemplate
         } = req.body;
         
         const jobId = req.params.id;
         const targetExperience = experience !== undefined ? experience : experienceLevel;
+        const targetCompany = companyId || company;
+
+        const parsedCgpa = minCgpa !== undefined ? Number(minCgpa) : undefined;
+        let parsedPercentage = minPercentage !== undefined ? Number(minPercentage) : undefined;
+
+        if ((parsedPercentage === undefined || parsedPercentage === 0) && parsedCgpa && parsedCgpa > 0) {
+            parsedPercentage = parseFloat((parsedCgpa * 10).toFixed(1));
+        }
+
+        let formattedRequirements;
+        if (requirements !== undefined) {
+            if (Array.isArray(requirements)) {
+                formattedRequirements = requirements.map(r => String(r).replace(/^[•\-\*]\s*/, '').trim()).filter(Boolean);
+            } else if (typeof requirements === 'string') {
+                formattedRequirements = requirements
+                    .split("\n")
+                    .flatMap(line => line.split(","))
+                    .map(r => r.replace(/^[•\-\*]\s*/, '').trim())
+                    .filter(Boolean);
+            }
+        }
 
         const updateData = {
-            title,
-            description,
-            requirements: requirements ? (Array.isArray(requirements) ? requirements : requirements.split(",")) : undefined,
+            title: title !== undefined ? title.trim() : undefined,
+            description: description !== undefined ? description.trim() : undefined,
+            requirements: formattedRequirements,
             salary: salary !== undefined ? Number(salary) : undefined,
-            location,
-            jobType,
+            location: location !== undefined ? location : undefined,
+            jobType: jobType !== undefined ? jobType : undefined,
             experienceLevel: targetExperience !== undefined ? Number(targetExperience) : undefined,
             position: position !== undefined ? Number(position) : undefined,
-            minCgpa: minCgpa !== undefined ? Number(minCgpa) : undefined,
-            minPercentage: minPercentage !== undefined ? Number(minPercentage) : undefined,
+            company: targetCompany !== undefined ? targetCompany : undefined,
+            minCgpa: parsedCgpa,
+            minPercentage: parsedPercentage,
             minTenthPercent: minTenthPercent !== undefined ? Number(minTenthPercent) : undefined,
             minTwelfthPercent: minTwelfthPercent !== undefined ? Number(minTwelfthPercent) : undefined,
-            allowedQualifications,
-            allowedDegrees,
-            allowedBranches,
-            allowedColleges
+            allowedQualifications: Array.isArray(allowedQualifications) ? allowedQualifications : undefined,
+            allowedDegrees: Array.isArray(allowedDegrees) ? allowedDegrees : undefined,
+            allowedBranches: Array.isArray(allowedBranches) ? allowedBranches : undefined,
+            allowedColleges: Array.isArray(allowedColleges) ? allowedColleges : undefined,
+            acceptanceEmailTemplate: acceptanceEmailTemplate !== undefined ? acceptanceEmailTemplate : undefined,
+            rejectionEmailTemplate: rejectionEmailTemplate !== undefined ? rejectionEmailTemplate : undefined
         };
 
-        // Remove undefined fields
+        // Strip undefined properties so unchanged fields remain preserved
         Object.keys(updateData).forEach(key => updateData[key] === undefined && delete updateData[key]);
 
         const job = await Job.findByIdAndUpdate(jobId, updateData, { new: true });
+        
         if (!job) {
             return res.status(404).json({
-                message: "Job not found.",
+                message: "Job opening not found.",
                 success: false
             });
         }
 
         return res.status(200).json({
-            message: "Job updated successfully.",
+            message: "Job opening updated successfully.",
             job,
             success: true
         });
     } catch (error) {
         console.error("Error in updateJob:", error);
         return res.status(500).json({
-            message: "Internal server error",
+            message: "Internal server error updating job",
             success: false
         });
     }
