@@ -54,7 +54,7 @@ const Signup = () => {
     const dispatch = useDispatch();
     const navigate = useNavigate();
 
-    // Fetch local DB companies
+    // Fetch local DB companies using dynamic endpoint
     useEffect(() => {
         const fetchAllCompanies = async () => {
             try {
@@ -62,7 +62,9 @@ const Signup = () => {
                 if (res.data.success && res.data.companies?.length > 0) {
                     setDbCompanies(res.data.companies);
                 }
-            } catch {}
+            } catch (err) {
+                console.error("Fetch DB Companies Error:", err);
+            }
         };
         fetchAllCompanies();
     }, []);
@@ -220,7 +222,7 @@ const Signup = () => {
 
             if (res.data.success) {
                 dispatch(setUser(res.data.user));
-                toast.success(res.data.message);
+                toast.success(res.data.message || "Account created successfully");
                 if (res.data.user.role === 'recruiter') {
                     navigate('/admin/jobs');
                 } else {
@@ -228,6 +230,7 @@ const Signup = () => {
                 }
             }
         } catch (error) {
+            console.error("Registration Error:", error);
             toast.error(error.response?.data?.message || "Registration failed");
         } finally {
             dispatch(setLoading(false));

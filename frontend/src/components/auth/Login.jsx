@@ -39,10 +39,10 @@ const Login = () => {
             if (res.data.success) {
                 dispatch(setUser(res.data.user));
                 navigate("/");
-                toast.success(res.data.message);
+                toast.success(res.data.message || "Logged in successfully");
             }
         } catch (error) {
-            console.error(error);
+            console.error("Login Error:", error);
             const errorMsg = error.response?.data?.message || "Login failed";
             const isNotFound = error.response?.status === 404 || error.response?.data?.notFound;
 
@@ -50,7 +50,6 @@ const Login = () => {
                 toast.error("No account found with this email. Redirecting to Sign Up...", {
                     duration: 3000
                 });
-                // Redirect immediately to /signup, passing the email to pre-fill it
                 navigate("/signup", { 
                     state: { 
                         prefillEmail: input.email, 
@@ -112,7 +111,7 @@ const Login = () => {
                                     value="student"
                                     checked={input.role === 'student'}
                                     onChange={changeEventHandler}
-                                    className="cursor-pointer w-4 h-4"
+                                    className="cursor-pointer w-4 h-4 accent-[#6A38C2]"
                                     id="r-student"
                                 />
                                 <Label htmlFor="r-student" className="cursor-pointer font-medium">Student</Label>
@@ -124,7 +123,7 @@ const Login = () => {
                                     value="recruiter"
                                     checked={input.role === 'recruiter'}
                                     onChange={changeEventHandler}
-                                    className="cursor-pointer w-4 h-4"
+                                    className="cursor-pointer w-4 h-4 accent-[#6A38C2]"
                                     id="r-recruiter"
                                 />
                                 <Label htmlFor="r-recruiter" className="cursor-pointer font-medium">Recruiter</Label>
@@ -148,7 +147,7 @@ const Login = () => {
                 </form>
             </div>
         </div>
-    )
-}
+    );
+};
 
 export default Login;
