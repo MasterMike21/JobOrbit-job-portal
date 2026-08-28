@@ -5,6 +5,14 @@ import jwt from "jsonwebtoken";
 import getDataUri from "../utils/datauri.js";
 import cloudinary from "../utils/cloudinary.js";
 
+// Cookie options for cross-domain auth (Vercel <-> Render)
+const COOKIE_OPTIONS = {
+    maxAge: 1 * 24 * 60 * 60 * 1000,
+    httpOnly: true,
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    secure: process.env.NODE_ENV === 'production' ? true : false
+};
+
 export const register = async (req, res) => {
     try {
         const {
@@ -48,7 +56,6 @@ export const register = async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, 10);
         let assignedCompanyId = null;
 
-        // Strict 1 Recruiter = 1 Company Rule
         if (role === 'recruiter') {
             const isNew = isNewCompany === 'true' || isNewCompany === true;
             
@@ -74,11 +81,9 @@ export const register = async (req, res) => {
                 }
                 assignedCompanyId = company._id;
             } else {
-                // If companyId was passed directly from a database match
                 if (companyId && companyId.trim() !== "") {
                     assignedCompanyId = companyId;
                 } else if (companyName && companyName.trim() !== "") {
-                    // Check if company exists in DB by typed name, otherwise create it
                     let company = await Company.findOne({
                         name: new RegExp(`^${companyName.trim()}$`, 'i')
                     });
@@ -118,12 +123,8 @@ export const register = async (req, res) => {
             });
         }
 
-        // Direct Auto-Login on Registration
-        const tokenData = {
-            userId: newUser._id
-        };
+        const tokenData = { userId: newUser._id };
         const token = jwt.sign(tokenData, process.env.SECRET_KEY, { expiresIn: '1d' });
-
         const populatedUser = await User.findById(newUser._id).populate('profile.company');
 
         const userResponse = {
@@ -136,11 +137,7 @@ export const register = async (req, res) => {
         };
 
         return res.status(201)
-            .cookie("token", token, { 
-                maxAge: 1 * 24 * 60 * 60 * 1000, 
-                httpOnly: true, 
-                sameSite: 'strict' 
-            })
+            .cookie("token", token, COOKIE_OPTIONS)
             .json({
                 message: `Account created successfully. Welcome, ${populatedUser.fullname}!`,
                 user: userResponse,
@@ -191,9 +188,7 @@ export const login = async (req, res) => {
             });
         }
 
-        const tokenData = {
-            userId: user._id
-        };
+        const tokenData = { userId: user._id };
         const token = jwt.sign(tokenData, process.env.SECRET_KEY, { expiresIn: '1d' });
 
         const userResponse = {
@@ -206,11 +201,7 @@ export const login = async (req, res) => {
         };
 
         return res.status(200)
-            .cookie("token", token, { 
-                maxAge: 1 * 24 * 60 * 60 * 1000, 
-                httpOnly: true, 
-                sameSite: 'strict' 
-            })
+            .cookie("token", token, COOKIE_OPTIONS)
             .json({
                 message: `Welcome back, ${user.fullname}`,
                 user: userResponse,
@@ -227,10 +218,12 @@ export const login = async (req, res) => {
 
 export const logout = async (req, res) => {
     try {
-        return res.status(200).cookie("token", "", { maxAge: 0 }).json({
-            message: "Logged out successfully.",
-            success: true
-        });
+        return res.status(200)
+            .cookie("token", "", { ...COOKIE_OPTIONS, maxAge: 0 })
+            .json({
+                message: "Logged out successfully.",
+                success: true
+            });
     } catch (error) {
         console.error("Logout Error:", error);
         return res.status(500).json({

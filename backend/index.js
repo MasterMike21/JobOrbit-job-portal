@@ -24,16 +24,15 @@ app.use(cookieParser());
 const allowedOrigins = [
     "http://localhost:5173",
     "http://localhost:3000",
-    process.env.CLIENT_URL // Set this in Render Environment Variables (e.g. https://your-app.vercel.app)
+    process.env.CLIENT_URL
 ].filter(Boolean);
 
 const corsOptions = {
     origin: function (origin, callback) {
-        // Allow requests with no origin (like mobile apps, curl, or Postman)
         if (!origin || allowedOrigins.indexOf(origin) !== -1 || allowedOrigins.some(o => origin.endsWith('.vercel.app'))) {
             callback(null, true);
         } else {
-            callback(null, true); // Permissive fallback for dynamic Vercel preview deployments
+            callback(null, true);
         }
     },
     credentials: true,
